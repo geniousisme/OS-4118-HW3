@@ -3,6 +3,21 @@
 #include <linux/light.h>
 
 struct light_intensity intensity;
+/* light history, use light_history[(history_count++) % WINDOW] to update */
+int light_history[WINDOW], history_count = 0;
+
+int event_check(struct event_requirements req)
+{
+	/* given a requirement, check if it's true based on the history */
+	/* should hold the lock for history */
+	int i, surpassed = 0;
+
+	for (i = 0; i < history_count && i < WINDOW; i++)
+		if (light_history[i] >= req.req_intensity - NOISE)
+			surpassed++;
+
+	return surpassed >= req.frequency ? 1 : 0;
+}
 
 /*
  * Set current ambient intensity in the kernel.
@@ -27,9 +42,10 @@ SYSCALL_DEFINE1(set_light_intensity, struct light_intensity __user *,
  * Retrive the scaled intensity set in the kernel.
  *
  * The same convention as the previous system call but
- * you are reading the value that was just set. 
+ * you are reading the value that was just set.
  * Handle error cases appropriately and return values according to convention.
- * The calling process should provide memory in userspace to return the intensity.
+ * The calling process should provide memory in userspace to return the
+ * intensity.
  *
  * syscall number 379
  */
@@ -74,7 +90,7 @@ SYSCALL_DEFINE1(light_evt_wait, int, event_id)
  *
  * Takes sensor data from user, stores the data in the kernel,
  * and notifies all open events whose
- * baseline is surpassed.  All processes waiting on a given event 
+ * baseline is surpassed.  All processes waiting on a given event
  * are unblocked.
  *
  * Return 0 success and the appropriate error on failure.
