@@ -63,6 +63,7 @@ struct getcpu_cache;
 struct old_linux_dirent;
 struct perf_event_attr;
 struct file_handle;
+struct light_intensity;
 
 #include <linux/types.h>
 #include <linux/aio_abi.h>
@@ -857,5 +858,8 @@ asmlinkage long sys_process_vm_writev(pid_t pid,
 				      const struct iovec __user *rvec,
 				      unsigned long riovcnt,
 				      unsigned long flags);
-
+asmlinkage long sys_set_light_intensity(
+		struct light_intensity __user *user_light_intensity);
+asmlinkage long sys_get_light_intensity(
+		struct light_intensity __user *user_light_intensity);
 #endif
