@@ -21,3 +21,25 @@ SYSCALL_DEFINE1(get_light_intensity, struct light_intensity __user *,
 		return -EINVAL;
 	return 0;
 }
+
+SYSCALL_DEFINE1(light_evt_create, struct event_requirements __user *,
+	intensity_params)
+{
+	return 0;
+}
+
+SYSCALL_DEFINE1(light_evt_wait, int, event_id)
+{
+	return 0;
+}
+
+SYSCALL_DEFINE1(light_evt_signal, struct light_intensity __user *,
+	user_light_intensity)
+{
+	return 0;
+}
+
+SYSCALL_DEFINE1(light_evt_destroy, int, event_id)
+{
+	return 0;
+}

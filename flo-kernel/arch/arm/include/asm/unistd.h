@@ -406,6 +406,10 @@
 #define __NR_process_vm_writev		(__NR_SYSCALL_BASE+377)
 #define __NR_set_light_intensity	(__NR_SYSCALL_BASE+378)
 #define __NR_get_light_intensity	(__NR_SYSCALL_BASE+379)
+#define __NR_light_evt_create		(__NR_SYSCALL_BASE+380)
+#define __NR_light_evt_wait		(__NR_SYSCALL_BASE+381)
+#define __NR_light_evt_signal		(__NR_SYSCALL_BASE+382)
+#define __NR_light_evt_destroy		(__NR_SYSCALL_BASE+383)
 
 /*
  * The following SWIs are ARM private.
