@@ -126,6 +126,7 @@ SYSCALL_DEFINE1(light_evt_wait, int, event_id)
 {
 	/* see LKD page 59 */
 	DEFINE_WAIT(wait);
+
 	add_wait_queue(&queue, &wait);
 	while (!event_check(event_id)) {
 		prepare_to_wait(&queue, &wait, TASK_INTERRUPTIBLE);

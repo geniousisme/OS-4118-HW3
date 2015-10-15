@@ -15,7 +15,7 @@
 #define SLEEP (60 * 1000 * 1000)
 #define WINDOW 20
 
-void wait_on_light_event(int event_id, char* msg)
+void wait_on_light_event(int event_id, char *msg)
 {
 	pid_t pid = fork();
 
