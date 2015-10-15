@@ -1,32 +1,38 @@
 #include <linux/idr.h>
 #include <linux/light.h>
-#include <linux/spinlock.h>
+#include <linux/slab.h>
 #include <linux/syscalls.h>
 #include <linux/uaccess.h>
 #include <linux/wait.h>
 
-struct light_intensity intensity;
-/* light history, use light_history[(history_count++) % WINDOW] to update */
+struct light_intensity intensity = { .cur_intensity = 0 };
 int light_history[WINDOW], history_count = 0;
 
 spinlock_t IDR_LOCK;
 
-int events_init = 0;
+int has_events = 0;
 DEFINE_IDR(events);
 DECLARE_WAIT_QUEUE_HEAD(queue);
 
-int event_check(struct event_requirements req)
+int event_check(int event_id)
 {
-	/* given a requirement, check if it's true based on the history */
-	/* should hold the lock for history */
+	/* given a event_id, check if it's true based on the history */
+	/* also return true if the event has been removed */
 	int i, surpassed = 0;
+	struct event_requirements *req;
+
+	spin_lock(&IDR_LOCK);
+	req = idr_find(&events, event_id);
+	spin_unlock(&IDR_LOCK);
+	if (req == NULL)
+		return 1;
 
 	/* TODO read lock*/
-	for (i = 0; i < history_count && i < WINDOW; i++)
-		if (light_history[i] >= req.req_intensity - NOISE)
+	for (i = 0; i < WINDOW && i < history_count; i++)
+		if (light_history[i] > req->req_intensity - NOISE)
 			surpassed++;
 
-	return surpassed >= req.frequency ? 1 : 0;
+	return surpassed >= req->frequency;
 }
 
 /*
@@ -80,16 +86,20 @@ SYSCALL_DEFINE1(light_evt_create, struct event_requirements __user *,
 	intensity_params)
 {
 	int event_id, ret;
-	struct event_requirements req;
+	struct event_requirements *req;
 
-	if (copy_from_user(&req, intensity_params,
+	req = kmalloc(sizeof(struct event_requirements), GFP_KERNEL);
+	if (req == NULL)
+		return -EFAULT;
+
+	if (copy_from_user(req, intensity_params,
 			sizeof(struct event_requirements)))
 		return -EINVAL;
 
 	spin_lock(&IDR_LOCK);
-	if (!events_init) {
+	if (!has_events) {
 		idr_init(&events);
-		events_init = 1;
+		has_events = 1;
 	}
 	if (idr_pre_get(&events, GFP_KERNEL) == 0)
 		return -ENOMEM;
@@ -97,7 +107,7 @@ SYSCALL_DEFINE1(light_evt_create, struct event_requirements __user *,
 	do {
 		if (!idr_pre_get(&events, GFP_KERNEL))
 			return -ENOSPC;
-		ret = idr_get_new(&events, &req, &event_id);
+		ret = idr_get_new(&events, req, &event_id);
 	} while (ret == -EAGAIN);
 	spin_unlock(&IDR_LOCK);
 
@@ -114,16 +124,10 @@ SYSCALL_DEFINE1(light_evt_create, struct event_requirements __user *,
  */
 SYSCALL_DEFINE1(light_evt_wait, int, event_id)
 {
-	struct event_requirements *req;
-	DEFINE_WAIT(wait);
-
-	req = idr_find(&events, event_id);
-	if (req == NULL)
-		return -EINVAL;
-
 	/* see LKD page 59 */
+	DEFINE_WAIT(wait);
 	add_wait_queue(&queue, &wait);
-	while (!event_check(*req)) {
+	while (!event_check(event_id)) {
 		prepare_to_wait(&queue, &wait, TASK_INTERRUPTIBLE);
 		if (signal_pending(current))
 			break;
@@ -157,7 +161,6 @@ SYSCALL_DEFINE1(light_evt_signal, struct light_intensity __user *,
 
 	/* TODO write lock here */
 	light_history[(history_count++) % WINDOW] = intensity.cur_intensity;
-
 	wake_up(&queue);
 
 	return 0;
@@ -172,5 +175,17 @@ SYSCALL_DEFINE1(light_evt_signal, struct light_intensity __user *,
  */
 SYSCALL_DEFINE1(light_evt_destroy, int, event_id)
 {
+	struct event_requirements *req;
+
+	spin_lock(&IDR_LOCK);
+	req = idr_find(&events, event_id);
+	spin_unlock(&IDR_LOCK);
+
+	if (req != NULL) {
+		kfree(req);
+		spin_lock(&IDR_LOCK);
+		idr_remove(&events, event_id);
+		spin_unlock(&IDR_LOCK);
+	}
 	return 0;
 }
