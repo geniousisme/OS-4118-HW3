@@ -127,6 +127,7 @@ static int poll_sensor_data(struct sensors_poll_device_t *sensors_device)
 			printf("%f\n", cur_intensity);
 			light.cur_intensity = (int)(100 * cur_intensity);
 			syscall(__NR_set_light_intensity, &light);
+			syscall(__NR_light_evt_signal, &light);
 			light.cur_intensity = 0;
 			syscall(__NR_get_light_intensity, &light);
 			printf("%d\n", light.cur_intensity);
@@ -141,6 +142,12 @@ static int poll_sensor_data(struct sensors_poll_device_t *sensors_device)
 		/* have fed to light_sensor binary */
 		cur_intensity = poll_sensor_data_emulator();
 		printf("%f\n", cur_intensity);
+		light.cur_intensity = (int)(100 * cur_intensity);
+		syscall(__NR_set_light_intensity, &light);
+		syscall(__NR_light_evt_signal, &light);
+		light.cur_intensity = 0;
+		syscall(__NR_get_light_intensity, &light);
+		printf("%d\n", light.cur_intensity);
 	}
 
 	return 0;

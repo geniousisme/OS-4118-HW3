@@ -8,10 +8,10 @@
 
 #define PRINT_ERRNO() (printf("error: %s\n", strerror(errno)))
 
-#define LOW 5000
-#define MEDIUM 10000
-#define HIGH 15000
-#define N 3
+#define LOW 0
+#define MEDIUM 100
+#define HIGH 150
+#define N 1
 #define SLEEP (60 * 1000 * 1000)
 #define WINDOW 20
 
@@ -40,6 +40,7 @@ void wait_on_light_event(int intensity)
 			.frequency = WINDOW / 2
 		};
 
+		printf("process %d starts\n", getpid());
 		event_id = syscall(380, &req);
 		printf("process %d waits on event %d\n", getpid(), event_id);
 		syscall(381, event_id);
