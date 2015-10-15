@@ -1,0 +1,7 @@
+TODO
+
+- add read/write lock in kernel/light.c for history record?
+- make light_d a daemon, remeber to call syscall 378 and 382
+- run style checker
+- clean test/test.c
+- test on emulator
