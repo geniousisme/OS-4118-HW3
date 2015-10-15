@@ -70,7 +70,7 @@ run_%: $(TARGET)
 	@echo "You may have to keep your screen off for this to work..."
 	@echo 
 	@sleep 2
-	@echo "$(TARGET_DIR)/$(TARGET) && exit" | adb $(ADB_OPT) shell
+	@echo "$(TARGET_DIR)/$(TARGET) $(ADB_OPT) && exit" | adb $(ADB_OPT) shell
 
 .PHONY:
 

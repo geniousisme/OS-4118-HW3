@@ -8,10 +8,10 @@
 
 #define PRINT_ERRNO() (printf("error: %s\n", strerror(errno)))
 
-#define LOW 100
-#define MEDIUM 500
-#define HIGH 1000
-#define N 1
+#define LOW 1000
+#define MEDIUM 2000
+#define HIGH 3000
+#define N 3
 #define SLEEP (60 * 1000 * 1000)
 #define WINDOW 20
 
@@ -34,7 +34,7 @@ int main(void)
 {
 	int i, id_low, id_medium, id_high;
 	struct event_requirements req = {
-		.frequency = WINDOW / 2 + 1
+		.frequency = WINDOW / 2
 	};
 
 	req.req_intensity = LOW;

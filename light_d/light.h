@@ -5,6 +5,8 @@
 Use this wrapper to pass the intensity to your system call
 */
 
+#define TIME_INTERVAL  200
+
 struct light_intensity{
 	int cur_intensity;
 };
