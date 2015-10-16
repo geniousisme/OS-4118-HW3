@@ -12,7 +12,7 @@
 #define MEDIUM 2000
 #define HIGH 3000
 #define N 3
-#define SLEEP (60 * 1000 * 1000)
+#define SLEEP (1 * 1000 * 1000)
 #define WINDOW 20
 
 void wait_on_light_event(int event_id, char *msg)
@@ -36,6 +36,7 @@ int main(void)
 	struct event_requirements req = {
 		.frequency = WINDOW / 2
 	};
+	struct light_intensity intensity;
 
 	req.req_intensity = LOW;
 	id_low = syscall(380, &req);
@@ -49,7 +50,11 @@ int main(void)
 		wait_on_light_event(id_medium, "medium");
 		wait_on_light_event(id_high, "high");
 	}
-	usleep(SLEEP);
+	for (i = 0; i < 60; i++) {
+		syscall(379, &intensity);
+		printf("current intensity: %d\n", intensity.cur_intensity);
+		usleep(SLEEP);
+	}
 	syscall(383, id_low);
 	syscall(383, id_medium);
 	syscall(383, id_high);
