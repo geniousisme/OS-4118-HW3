@@ -5,3 +5,11 @@ TODO
 - run style checker
 - clean test/test.c
 - test on emulator
+
+TO FIX
+
+When calling light_evt_destroy(), it should wake up the processes in the queue
+that wait on the event. A possible way to implement tihs is waking up every
+process, which is inefficient.
+
+idr_remove() will free the memory.

@@ -10,7 +10,7 @@ int light_history[WINDOW], history_count = 0;
 
 spinlock_t IDR_LOCK;
 
-int has_events = 0;
+int has_events = 0, max_id = 0;
 DEFINE_IDR(events);
 DECLARE_WAIT_QUEUE_HEAD(queue);
 
@@ -24,6 +24,10 @@ int event_check(int event_id)
 	spin_lock(&IDR_LOCK);
 	req = idr_find(&events, event_id);
 	spin_unlock(&IDR_LOCK);
+
+	/* TODO This is incomplete, the same event_id may be reused after */
+	/* the old one is destroyed */
+	/* Can be solve be assigning strictly increasing id. (LDK page 102) */
 	if (req == NULL)
 		return 1;
 
@@ -104,11 +108,14 @@ SYSCALL_DEFINE1(light_evt_create, struct event_requirements __user *,
 	if (idr_pre_get(&events, GFP_KERNEL) == 0)
 		return -ENOMEM;
 	/* see LKD page 102 */
+	/* asssign strictly increasing event_id */
 	do {
 		if (!idr_pre_get(&events, GFP_KERNEL))
 			return -ENOSPC;
-		ret = idr_get_new(&events, req, &event_id);
+		ret = idr_get_new_above(&events, req, max_id, &event_id);
 	} while (ret == -EAGAIN);
+	if (!ret)
+		max_id += 1;
 	spin_unlock(&IDR_LOCK);
 
 	return event_id;
@@ -182,11 +189,17 @@ SYSCALL_DEFINE1(light_evt_destroy, int, event_id)
 	req = idr_find(&events, event_id);
 	spin_unlock(&IDR_LOCK);
 
+	/* unlock and lock would be efficient if we are trying to destroy */
+	/* a lot of events that are not exist */
 	if (req != NULL) {
-		kfree(req);
 		spin_lock(&IDR_LOCK);
+		/* idr_remove() will free req */
 		idr_remove(&events, event_id);
 		spin_unlock(&IDR_LOCK);
+
+		/* this is inefficient since it is sufficient to  wake up */
+		/* the processes that are waiting on this event */
+		wake_up(&queue);
 	}
 	return 0;
 }
