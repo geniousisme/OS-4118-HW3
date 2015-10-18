@@ -11,6 +11,7 @@ static int light_history[WINDOW], history_count;
 spinlock_t IDR_LOCK;
 
 DEFINE_IDR(events);
+DEFINE_RWLOCK(history_rwlock); /* see LKD page 188 for reader writer lock */
 DECLARE_WAIT_QUEUE_HEAD(queue);
 
 static int event_check(int event_id)
@@ -29,10 +30,11 @@ static int event_check(int event_id)
 	if (req == NULL)
 		return 1;
 
-	/* TODO read lock*/
+	read_lock(&history_rwlock);
 	for (i = 0; i < WINDOW && i < history_count; i++)
 		if (light_history[i] > req->req_intensity - NOISE)
 			surpassed++;
+	read_unlock(&history_rwlock);
 
 	return surpassed >= req->frequency;
 }
@@ -177,8 +179,10 @@ SYSCALL_DEFINE1(light_evt_signal, struct light_intensity __user *,
 			sizeof(struct light_intensity)))
 		return -EINVAL;
 
-	/* TODO write lock here */
+	write_lock(&history_rwlock);
 	light_history[(history_count++) % WINDOW] = intensity.cur_intensity;
+	write_unlock(&history_rwlock);
+
 	wake_up(&queue);
 
 	return 0;
