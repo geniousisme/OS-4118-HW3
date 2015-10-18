@@ -5,16 +5,15 @@
 #include <linux/uaccess.h>
 #include <linux/wait.h>
 
-struct light_intensity intensity = { .cur_intensity = 0 };
-int light_history[WINDOW], history_count = 0;
+static struct light_intensity intensity = { .cur_intensity = 0 };
+static int light_history[WINDOW], history_count;
 
 spinlock_t IDR_LOCK;
 
-int has_events = 0, max_id = 0;
 DEFINE_IDR(events);
 DECLARE_WAIT_QUEUE_HEAD(queue);
 
-int event_check(int event_id)
+static int event_check(int event_id)
 {
 	/* given a event_id, check if it's true based on the history */
 	/* also return true if the event has been removed */
@@ -25,9 +24,8 @@ int event_check(int event_id)
 	req = idr_find(&events, event_id);
 	spin_unlock(&IDR_LOCK);
 
-	/* TODO This is incomplete, the same event_id may be reused after */
-	/* the old one is destroyed */
-	/* Can be solve be assigning strictly increasing id. (LDK page 102) */
+	/* Check if the id was removed */
+	/* This is correct as long as we don't reuse event_it */
 	if (req == NULL)
 		return 1;
 
@@ -75,6 +73,7 @@ SYSCALL_DEFINE1(get_light_intensity, struct light_intensity __user *,
 	if (copy_to_user(user_light_intensity, &intensity,
 		sizeof(struct light_intensity)))
 		return -EINVAL;
+
 	return 0;
 }
 
@@ -90,32 +89,43 @@ SYSCALL_DEFINE1(light_evt_create, struct event_requirements __user *,
 	intensity_params)
 {
 	int event_id, ret;
+	static int firsttime = 1, max_id;
 	struct event_requirements *req;
 
 	req = kmalloc(sizeof(struct event_requirements), GFP_KERNEL);
 	if (req == NULL)
-		return -EFAULT;
+		return -ENOMEM;
 
 	if (copy_from_user(req, intensity_params,
-			sizeof(struct event_requirements)))
+			sizeof(struct event_requirements))) {
+		kfree(req);
 		return -EINVAL;
+	}
 
 	spin_lock(&IDR_LOCK);
-	if (!has_events) {
+
+	if (firsttime) {
 		idr_init(&events);
-		has_events = 1;
+		firsttime = 0;
 	}
-	if (idr_pre_get(&events, GFP_KERNEL) == 0)
+	if (idr_pre_get(&events, GFP_KERNEL) == 0) {
+		kfree(req);
 		return -ENOMEM;
+	}
+
 	/* see LKD page 102 */
 	/* asssign strictly increasing event_id */
 	do {
-		if (!idr_pre_get(&events, GFP_KERNEL))
+		if (!idr_pre_get(&events, GFP_KERNEL)) {
+			kfree(req);
 			return -ENOSPC;
+		}
 		ret = idr_get_new_above(&events, req, max_id, &event_id);
 	} while (ret == -EAGAIN);
+
 	if (!ret)
 		max_id += 1;
+
 	spin_unlock(&IDR_LOCK);
 
 	return event_id;
