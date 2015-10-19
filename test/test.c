@@ -11,7 +11,7 @@
 #define LOW 1000
 #define MEDIUM 2000
 #define HIGH 3000
-#define N 3
+#define N 5
 #define SLEEP (1 * 1000 * 1000)
 #define WINDOW 20
 
@@ -50,11 +50,12 @@ int main(void)
 		wait_on_light_event(id_medium, "medium");
 		wait_on_light_event(id_high, "high");
 	}
-	for (i = 0; i < 60; i++) {
+	for (i = 0; i < 120; i++) {
 		syscall(379, &intensity);
 		printf("current intensity: %d\n", intensity.cur_intensity);
 		usleep(SLEEP);
 	}
+	printf("Timeout: removing all events");
 	syscall(383, id_low);
 	syscall(383, id_medium);
 	syscall(383, id_high);

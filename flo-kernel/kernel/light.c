@@ -181,6 +181,7 @@ SYSCALL_DEFINE1(light_evt_signal, struct light_intensity __user *,
 	light_history[(history_count++) % WINDOW] = intensity.cur_intensity;
 	write_unlock(&history_rwlock);
 
+	/* an optimization would be wake up only if new intensity is larger */
 	wake_up(&queue);
 
 	return 0;
