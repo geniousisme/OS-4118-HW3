@@ -12,6 +12,7 @@ spinlock_t idr_lock;
 
 DEFINE_IDR(events);
 DEFINE_RWLOCK(history_rwlock); /* see LKD page 188 for reader writer lock */
+DEFINE_RWLOCK(intensity_rwlock);
 DECLARE_WAIT_QUEUE_HEAD(queue);
 
 static int event_check(int event_id)
@@ -26,7 +27,7 @@ static int event_check(int event_id)
 	spin_unlock(&idr_lock);
 
 	/* Check if the id was removed */
-	/* This is correct as long as we don't reuse event_it */
+	/* This is correct as long as we don't reuse event_id */
 	if (req == NULL)
 		return 1;
 
@@ -52,9 +53,13 @@ static int event_check(int event_id)
 SYSCALL_DEFINE1(set_light_intensity, struct light_intensity __user *,
 	user_light_intensity)
 {
+	write_lock(&intensity_rwlock);
 	if (copy_from_user(&intensity, user_light_intensity,
-		sizeof(struct light_intensity)))
+		sizeof(struct light_intensity))) {
+		write_unlock(&intensity_rwlock);
 		return -EINVAL;
+	}
+	write_unlock(&intensity_rwlock);
 	return 0;
 }
 
@@ -72,10 +77,13 @@ SYSCALL_DEFINE1(set_light_intensity, struct light_intensity __user *,
 SYSCALL_DEFINE1(get_light_intensity, struct light_intensity __user *,
 	user_light_intensity)
 {
+	read_lock(&intensity_rwlock);
 	if (copy_to_user(user_light_intensity, &intensity,
-		sizeof(struct light_intensity)))
+		sizeof(struct light_intensity))) {
+		read_unlock(&intensity_rwlock);
 		return -EINVAL;
-
+	}
+	read_unlock(&intensity_rwlock);
 	return 0;
 }
 
@@ -114,6 +122,7 @@ SYSCALL_DEFINE1(light_evt_create, struct event_requirements __user *,
 	/* see LKD page 102 */
 	/* asssign strictly increasing event_id */
 	do {
+		/* cannot hold the lock while allocating memory */
 		if (!idr_pre_get(&events, GFP_KERNEL)) {
 			kfree(req);
 			return -ENOSPC;
@@ -123,10 +132,10 @@ SYSCALL_DEFINE1(light_evt_create, struct event_requirements __user *,
 		if (ret == -EAGAIN)
 			spin_unlock(&idr_lock);
 	} while (ret == -EAGAIN);
-	spin_unlock(&idr_lock);
 
 	if (!ret)
 		max_id += 1;
+	spin_unlock(&idr_lock);
 
 	return event_id;
 }
@@ -181,7 +190,7 @@ SYSCALL_DEFINE1(light_evt_signal, struct light_intensity __user *,
 	light_history[(history_count++) % WINDOW] = intensity.cur_intensity;
 	write_unlock(&history_rwlock);
 
-	/* an optimization would be wake up only if new intensity is larger */
+	/* an optimization is to wake up only if the new intensity is larger */
 	wake_up(&queue);
 
 	return 0;
