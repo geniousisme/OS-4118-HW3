@@ -45,8 +45,7 @@ static void enumerate_sensors(const struct sensors_module_t *sensors);
 static int poll_sensor_data_emulator(void);
 static int poll_sensor_data(struct sensors_poll_device_t *sensors_device);
 
-/* entry point: fill in daemon implementation
-   where indicated */
+/* entry point: fill in daemon implementation where indicated */
 
 void daemon_mode(void)
 {
