@@ -8,7 +8,7 @@
 static struct light_intensity intensity = { .cur_intensity = 0 };
 static int light_history[WINDOW], history_count;
 
-spinlock_t IDR_LOCK;
+spinlock_t idr_lock;
 
 DEFINE_IDR(events);
 DEFINE_RWLOCK(history_rwlock); /* see LKD page 188 for reader writer lock */
@@ -21,9 +21,9 @@ static int event_check(int event_id)
 	int i, surpassed = 0;
 	struct event_requirements *req;
 
-	spin_lock(&IDR_LOCK);
+	spin_lock(&idr_lock);
 	req = idr_find(&events, event_id);
-	spin_unlock(&IDR_LOCK);
+	spin_unlock(&idr_lock);
 
 	/* Check if the id was removed */
 	/* This is correct as long as we don't reuse event_it */
@@ -104,16 +104,12 @@ SYSCALL_DEFINE1(light_evt_create, struct event_requirements __user *,
 		return -EINVAL;
 	}
 
-	spin_lock(&IDR_LOCK);
-
+	spin_lock(&idr_lock);
 	if (firsttime) {
 		idr_init(&events);
 		firsttime = 0;
 	}
-	if (idr_pre_get(&events, GFP_KERNEL) == 0) {
-		kfree(req);
-		return -ENOMEM;
-	}
+	spin_unlock(&idr_lock);
 
 	/* see LKD page 102 */
 	/* asssign strictly increasing event_id */
@@ -122,13 +118,15 @@ SYSCALL_DEFINE1(light_evt_create, struct event_requirements __user *,
 			kfree(req);
 			return -ENOSPC;
 		}
+		spin_lock(&idr_lock);
 		ret = idr_get_new_above(&events, req, max_id, &event_id);
+		if (ret == -EAGAIN)
+			spin_unlock(&idr_lock);
 	} while (ret == -EAGAIN);
+	spin_unlock(&idr_lock);
 
 	if (!ret)
 		max_id += 1;
-
-	spin_unlock(&IDR_LOCK);
 
 	return event_id;
 }
@@ -199,17 +197,17 @@ SYSCALL_DEFINE1(light_evt_destroy, int, event_id)
 {
 	struct event_requirements *req;
 
-	spin_lock(&IDR_LOCK);
+	spin_lock(&idr_lock);
 	req = idr_find(&events, event_id);
-	spin_unlock(&IDR_LOCK);
+	spin_unlock(&idr_lock);
 
 	/* unlock and lock would be efficient if we are trying to destroy */
 	/* a lot of events that are not exist */
 	if (req != NULL) {
-		spin_lock(&IDR_LOCK);
+		spin_lock(&idr_lock);
 		/* idr_remove() will free req */
 		idr_remove(&events, event_id);
-		spin_unlock(&IDR_LOCK);
+		spin_unlock(&idr_lock);
 
 		/* this is inefficient since it is sufficient to  wake up */
 		/* the processes that are waiting on this event */
