@@ -13,3 +13,15 @@ that wait on the event. A possible way to implement tihs is waking up every
 process, which is inefficient.
 
 idr_remove() will free the memory.
+
+A daemon process can be developed just like any other process but there is one thing that differentiates it with any other normal process ie having no controlling terminal. This is a major design aspect in creating a daemon process. This can be achieved by :
+
+Create a normal process (Parent process)
+Create a child process from within the above parent process
+The process hierarchy at this stage looks like :  TERMINAL -> PARENT PROCESS -> CHILD PROCESS
+Terminate the the parent process.
+The child process now becomes orphan and is taken over by the init process.
+Call setsid() function to run the process in new session and have a new group.
+After the above step we can say that now this process becomes a daemon process without having a controlling terminal.
+Change the working directory of the daemon process to root and close stdin, stdout and stderr file descriptors.
+Let the main logic of daemon process run.

@@ -70,12 +70,11 @@ void daemon_mode(void)
 		dbg("You failed to fork, byebye\n");
 		exit(EXIT_FAILURE);
 	}
-
 	if (pid > 0) {
 		dbg("I am parent, byebye\n");
 		exit(EXIT_SUCCESS);
 	}
-
+	/* set new session */
 	if (setsid() < 0) {
 		dbg("Fail to run the process in new session.\n");
 		exit(EXIT_FAILURE);
@@ -102,7 +101,7 @@ void daemon_mode(void)
 		dbg("chdir failed\n");
 		exit(EXIT_FAILURE);
 	}
-
+	/* Basically let daemon to do somethings */
 	dev_file = open("/dev/null", O_RDWR);
 	if (dev_file < 0) {
 		dbg("Fail to open a NULL program.");
