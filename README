@@ -1,27 +1,23 @@
-TODO
 
-- add read/write lock in kernel/light.c for history record?
-- make light_d a daemon, remeber to call syscall 378 and 382
-- run style checker
-- clean test/test.c
-- test on emulator
+For developing daemon process,it is just like any other process, but there is one thing different from others --- it has no controlling terminal. The following are the major design aspect:
 
-TO FIX
+- Create a normal process (Parent process)
+- Create a child process from within the above parent process
+    - The process hierarchy at this stage looks like :  TERMINAL -> PARENT PROCESS -> CHILD PROCESS
+- Terminate the the parent process.
+- The child process now becomes orphan and is taken over by the init process.
+- Call setsid() function to run the process in new session and have a new group.
+- After the above step we can say that now this process becomes a daemon process without having a controlling terminal.
+- Change the working directory of the daemon process to root and close stdin, stdout and stderr file descriptors.
+- Let the main logic of daemon process run.
 
-When calling light_evt_destroy(), it should wake up the processes in the queue
-that wait on the event. A possible way to implement tihs is waking up every
-process, which is inefficient.
+For syscall 378 and 379 (set_light_intensity, get_light_intensity), we used a
+global variable 'intensity' to store the value. And we implemented the function
+by setting/getting the variable using copy_from_user and copy_to_user. We also
+added a reader writer lock to make it thread safe.
 
-idr_remove() will free the memory.
-
-A daemon process can be developed just like any other process but there is one thing that differentiates it with any other normal process ie having no controlling terminal. This is a major design aspect in creating a daemon process. This can be achieved by :
-
-Create a normal process (Parent process)
-Create a child process from within the above parent process
-The process hierarchy at this stage looks like :  TERMINAL -> PARENT PROCESS -> CHILD PROCESS
-Terminate the the parent process.
-The child process now becomes orphan and is taken over by the init process.
-Call setsid() function to run the process in new session and have a new group.
-After the above step we can say that now this process becomes a daemon process without having a controlling terminal.
-Change the working directory of the daemon process to root and close stdin, stdout and stderr file descriptors.
-Let the main logic of daemon process run.
+For syscall 380 to 383, we used idr to store the event_id table. We used a
+spinlock to protect the idr table. Also there's a global variable
+'light_history[WINDOW]' which stores the last WINDOW records we got from
+syscall 382 (light_evt_signal). We used another reader writer lock to protect
+it.

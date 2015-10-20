@@ -49,10 +49,7 @@ static int poll_sensor_data(struct sensors_poll_device_t *sensors_device);
 
 void daemon_mode(void)
 {
-/* Fill in daemon implementation here */
-/* http://www.go4expert.com/articles/writing-linux-daemon-process-c-t27616/ */
-/* http://www.thegeekstuff.com/2012/02/c-daemon-process/ */
-
+	/* Fill in daemon implementation here */
 	pid_t pid;
 	uid_t uid = getuid();
 	int dev_file;
